@@ -368,7 +368,8 @@ def bisect(a, x, lo=0, hi=None):
     return lo
 
 
-NOROOMERROR = "NOROOMERROR"
+class NoRoom(Exception):
+    pass
 
 Rootflag = 1
 Interiorflag = 2
@@ -486,7 +487,7 @@ class Node:
     # interior node operation
     def putnode(self, key, node):
         """
-        place a node for key into self.  Raise NOROOMERROR if no room
+        place a node for key into self
         """
         from types import StringType
         if not isinstance(key, StringType):
@@ -513,7 +514,7 @@ class Node:
         last = validkeys + 1
 
         if self.validkeys >= self.size:
-            raise NOROOMERROR("no room")
+            raise NoRoom("validkeys %d >= size %d" % (self.validkeys, self.size))
 
         # store the key
         if validkeys < 0:  # no nodes currently
@@ -693,7 +694,7 @@ class Node:
                 if validkeys >= self.size:
                     # print "node out of room"
                     # for x in self.__dict__.items(): print x
-                    raise NOROOMERROR("no room")
+                    raise NoRoom("validkeys %d >= size %d" % (validkeys, self.size))
 
                 place = bisect(keys, key, 0, validkeys)
                 # print "next entry at", place
@@ -1368,7 +1369,7 @@ class BplusTree:
                 try:
                     # insert if room
                     node.putnode(leftmost, insertnode)
-                except NOROOMERROR:
+                except NoRoom:
                     # no room, split
                     insertindex = insertnode.position
                     (newnode, self.free) = node.getfreenode(
@@ -1397,7 +1398,7 @@ class BplusTree:
             try:
                 # insert if room
                 node.putvalue(key, value)
-            except NOROOMERROR:
+            except NoRoom:
                 # no room: split
                 # get entries (dummy is ignored for leaves)
                 ki = node.keys_indices("dummy")
