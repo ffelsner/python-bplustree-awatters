@@ -322,6 +322,9 @@ http://www.pythonpros.com
 """
 
 import string
+import logging
+
+log = logging.getLogger(__name__)
 
 nilseek = -1
 
