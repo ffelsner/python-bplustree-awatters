@@ -401,6 +401,54 @@ class Node_Fifo:
         self.fifo_dict = {}
 
 
+def map_none(a, b):
+    """
+    This is to provides backwards compatibility with python2 where it supported
+        map(None, foo, bar)
+
+    python3 does not support this.  The following is the behavior you get with
+    python2 when map foo and bar together when they are of different size. This
+    also shows the behavior of map_none().
+
+        foo = ['a', 'b', 'c', 'd']
+        bar = [4, 5, 6]
+
+        print map(None, foo, bar)
+        print zip(foo, bar)
+        print map_none(foo, bar)
+
+
+        foo = ['a', 'b', 'c']
+        bar = [4, 5, 6, 7]
+        print('')
+        print map(None, foo, bar)
+        print zip(foo, bar)
+
+    When you run the code above:
+
+        [('a', 4), ('b', 5), ('c', 6), ('d', None)]
+        [('a', 4), ('b', 5), ('c', 6)]
+        [('a', 4), ('b', 5), ('c', 6), ('d', None)]
+
+        [('a', 4), ('b', 5), ('c', 6), (None, 7)]
+        [('a', 4), ('b', 5), ('c', 6)]
+        [('a', 4), ('b', 5), ('c', 6), (None, 7)]
+
+    """
+    len_a = len(a)
+    len_b = len(b)
+    result = zip(a, b)
+
+    if len_a > len_b:
+        for x in a[len_b:]:
+            result.append((x, None))
+    elif len_a < len_b:
+        for x in b[len_a:]:
+            result.append((None, x))
+
+    return result
+
+
 class Node:
     """
     B+ tree node
@@ -605,7 +653,7 @@ class Node:
         indices = self.indices[:len(keys)]
 
         # return pairing
-        return map(None, keys, indices)
+        return map_none(keys, indices)
 
     def getnode(self, key):
         """
