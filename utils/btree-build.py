@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 """
 Read a file of the format:
@@ -40,7 +40,8 @@ if os.path.isfile(btree_filename):
     sys.exit(1)
 
 with open(btree_filename, 'w+b') as fh_btree:
-    B = SBplusTree(fh_btree, position=0, nodesize=200, keylen=12)
+    #B = SBplusTree(fh_btree, position=0, nodesize=200, keylen=12)
+    B = SBplusTree(fh_btree, position=0, nodesize=8, keylen=12)
     B.startup()
     count = 0
 

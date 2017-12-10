@@ -321,6 +321,8 @@ http://starship.skyport.net/crew/aaron_watters
 http://www.pythonpros.com
 """
 
+from marshal import dumps
+from pprint import pformat
 import string
 import logging
 
@@ -328,10 +330,15 @@ log = logging.getLogger(__name__)
 
 nilseek = -1
 
-from marshal import dumps
-sequence_overhead = len(dumps(""))
-intsize = len(dumps(1))
+# In python2 sequence_overhead is 5 but in python3 this is 2...but then python3
+# will crash later because the 'storage' variable is not large enough (it is
+# calculated based off of sequence_overhead, size, etc). For now hard code this
+# to 5.
+#sequence_overhead = len(dumps(""))
+sequence_overhead = 5
 
+# intsize is 5 for both python2 and python3
+intsize = len(dumps(1))
 
 def insort(a, x, lo=0, hi=None):
     """
@@ -343,7 +350,7 @@ def insort(a, x, lo=0, hi=None):
         hi = len(a)
 
     while lo < hi:
-        mid = (lo + hi) / 2
+        mid = int((lo + hi) / 2)
 
         if x < a[mid]:
             hi = mid
@@ -362,7 +369,8 @@ def bisect(a, x, lo=0, hi=None):
         hi = len(a)
 
     while lo < hi:
-        mid = (lo + hi) / 2
+        mid = int((lo + hi) / 2)
+
         if x < a[mid]:
             hi = mid
         else:
@@ -437,7 +445,7 @@ def map_none(a, b):
     """
     len_a = len(a)
     len_b = len(b)
-    result = zip(a, b)
+    result = list(zip(a, b))
 
     if len_a > len_b:
         for x in a[len_b:]:
@@ -502,12 +510,15 @@ class Node:
         #   self.intstorage = self.intstorage + intsize
         # self.storage = (2 +           # flag, valid
         #                self.intstorage + self.keystorage)
+        # dwalton what is cloner
         if cloner is None:
-            self.storage = (sequence_overhead +  # list overhead
-                            2 * intsize +         # flag, valid
-                            (size + 1) * intsize +  # indices
-                            size * (sequence_overhead + keylen)  # keys
-                            )
+            self.storage = (sequence_overhead +                     # list overhead
+                            (2 * intsize) +                         # flag, valid
+                            ((size + 1) * intsize) +                # indices
+                            (size * (sequence_overhead + keylen)))  # keys
+
+            log.info("cloner is None, sequence_overhead %s, intsize %s, size %s, keylen %s, storage %s" %\
+                (sequence_overhead, intsize, size, keylen, pformat(self.storage)))
         else:
             self.storage = cloner.storage
             self.fifo = cloner.fifo
@@ -540,8 +551,7 @@ class Node:
         """
         place a node for key into self
         """
-        from types import StringType
-        if not isinstance(key, StringType):
+        if not isinstance(key, str):
             raise TypeError("bad key " + repr(key))
         position = node.position
         self.putposition(key, position)
@@ -691,7 +701,7 @@ class Node:
         return node
 
     # leaf mode operations
-    def next(self):
+    def __next__(self):
         """
         get next node from self in linear leaf sequence, or return None
         """
@@ -712,9 +722,7 @@ class Node:
         """
         put key->value mapping into leaf node
         """
-        from types import StringType, IntType
-
-        if not isinstance(key, StringType) and not isinstance(value, IntType):
+        if not isinstance(key, str) and not isinstance(value, int):
             raise ValueError("bad key, value" + repr((key, value)))
 
         if self.flag not in Leafflags:
@@ -771,7 +779,7 @@ class Node:
 
         # if length<self.size/2-1: # not valid for delete (?)
         #   raise IndexError, "not enough keys"+`length`
-        for i in xrange(length):
+        for i in range(length):
             (keys[i], indices[i]) = keys_indices[i]
 
     def put_all_positions(self, first_position, keys_positions):
@@ -790,7 +798,7 @@ class Node:
         #   raise IndexError, "not enough keys"+`length`
         indices[0] = first_position
 
-        for i in xrange(length):
+        for i in range(length):
             (keys[i], indices[i + 1]) = keys_positions[i]
 
     def delvalue(self, key):
@@ -821,7 +829,7 @@ class Node:
         try:
             place = self.keys.index(key)
         except ValueError:
-            raise KeyError("key not found: " + repr(key))
+            return None
         else:
             return self.indices[place]
 
@@ -1063,9 +1071,12 @@ class Node:
         storage = self.storage
 
         if (ls > storage):
-            raise ValueError("bad storage: " + repr(s))
+            log.info("s: %s" % s)
+            raise ValueError("bad storage (len(s) %d > storage %d)" % (ls, storage))
 
-        s = s + "X" * (storage - ls)
+        x_padding = "X" * (storage - ls)
+        x_padding = x_padding.encode('utf-8')
+        s = s + x_padding
         return s
 
         # indices = self.indices
@@ -1100,33 +1111,33 @@ class Node:
         flag = self.flag
 
         if flag == Freeflag:
-            print 'free->', self.position,
+            print('free->', self.position, end=' ')
             nextp = self.indices[0]
             if nextp != nilseek:
                 next = self.clone(nextp)
                 next = next.materialize()
                 next.dump()
             else:
-                print "!last"
+                print("!last")
             return
 
         nextindent = indent + "   "
-        print indent,
+        print(indent, end=' ')
 
         if flag == Rootflag:
-            print "root",
+            print("root", end=' ')
         elif flag == Interiorflag:
-            print "interior",
+            print("interior", end=' ')
         elif flag == Leafflag:
-            print "leaf",
+            print("leaf", end=' ')
         elif flag == LeafandRootflag:
-            print "root and leaf",
+            print("root and leaf", end=' ')
         else:
-            print "invalid flag???", flag,
+            print("invalid flag???", flag, end=' ')
 
-        print self.position, "valid=", self.validkeys
-        print indent, "keys", self.keys
-        print indent, "seeks", self.indices
+        print(self.position, "valid=", self.validkeys)
+        print(indent, "keys", self.keys)
+        print(indent, "seeks", self.indices)
 
         if flag in [Rootflag, Interiorflag]:
             # interior
@@ -1138,7 +1149,7 @@ class Node:
         else:
             # leaf
             pass
-        print indent, "*****"
+        print(indent, "*****")
 
 
 class BplusTree:
@@ -1294,12 +1305,10 @@ class BplusTree:
         self[key]=value -- set map for key to value
         """
 
-        from types import StringType, IntType
-
-        if not isinstance(key, StringType):
+        if not isinstance(key, str):
             raise ValueError("key must be string")
 
-        if not isinstance(value, IntType):
+        if not isinstance(value, int):
             raise ValueError("value must be int")
 
         if len(key) > self.keylen:
@@ -1634,7 +1643,7 @@ class BplusTree:
         return leftmost of node2
         firstindex is ignored for leaves
         """
-        middle = len(entries) / 2 + 1
+        middle = int(len(entries) / 2 + 1)
         # node1.clear()
         # node2.clear()
 
@@ -1830,7 +1839,7 @@ class BplusWalker:
         else:
             raise IndexError("not at valid index")
 
-    def next(self):
+    def __next__(self):
         """
         advance to next position, or set to invalid
         """
@@ -1875,7 +1884,8 @@ class caching_BPT(BplusTree):
         try:
             return self.cache[key]
         except KeyError:
-            r = self.cache[key] = BplusTree.__getitem__(self, key)
+            r = BplusTree.__getitem__(self, key)
+            self.cache[key] = r
             return r
 
     def reset_cache(self):
@@ -2002,8 +2012,8 @@ class SBplusWalker:
         seek = self.walker.current_value()
         return getstring(self.file, seek)
 
-    def next(self):
-        self.walker.next()
+    def __next__(self):
+        next(self.walker)
         self.valid = self.walker.valid
 
 
@@ -2025,6 +2035,10 @@ def getstring(infile, i):
     """
     get an old string record at i
     """
+
+    if i is None:
+        return None
+
     # save = infile.tell()
     infile.seek(i)
     from marshal import load
@@ -2067,23 +2081,23 @@ def recopy_tree(fromtree, totree):
 
             # pseudooptimization: defer n/2-1 tail elements
             # for n even this makes all leaves full (in tests)
-            for i in xrange(part1):
+            for i in range(part1):
                 if not walker.valid:
                     break
                 totree[walker.current_key()] = walker.current_value()
-                walker.next()
+                next(walker)
 
             for (k, v) in defer:
                 totree[k] = v
 
             defer = []
-            for i in xrange(part2):
+            for i in range(part2):
 
                 if not walker.valid:
                     break
 
                 defer.append((walker.current_key(), walker.current_value()))
-                walker.next()
+                next(walker)
 
         for (k, v) in defer:
             totree[k] = v
@@ -2259,10 +2273,10 @@ class dbm:
             spairs = w.current_value()
             pairs = loads(spairs)
 
-            for k in pairs.keys():
+            for k in list(pairs.keys()):
                 result.append(k)
 
-            w.next()
+            next(w)
 
         if len(result) != self.length:
             raise IndexError("bad tree length:" + repr((len(result), self.length)))
@@ -2291,43 +2305,43 @@ class dbm:
             while w.valid:
                 spairs = w.current_value()
                 pairs = loads(spairs)
-                for (k, v) in pairs.items():
+                for (k, v) in list(pairs.items()):
                     other[k] = v
-                w.next()
+                next(w)
 
         return other
 
 
 def testdbm():
 
-    print "creating files test1, 2, 3 for dbm test"
+    print("creating files test1, 2, 3 for dbm test")
     d1 = dbm("test1", "c")
     for x in range(10):
         key = "hello" * x
         d1[key] = "01234567890"[:-x]
-        print key, d1[key]
-    print d1.keys()
+        print(key, d1[key])
+    print(list(d1.keys()))
     for x in range(300):
         d1[oct(x)] = hex(x)
     del d1['']
-    print len(d1), d1.keys()
-    print "should be 0:", "" in d1, "abd" in d1
-    print "copying"
+    print(len(d1), list(d1.keys()))
+    print("should be 0:", "" in d1, "abd" in d1)
+    print("copying")
     d2 = d1.copy("test2", "c")
     beforedel = len(d1)
     del d2["hello"]
-    print len(d2), d2.keys()
+    print(len(d2), list(d2.keys()))
     d2.close()
     d2 = dbm("test2", "r")
-    print "should be equal", beforedel - 1, len(d2)
-    print "keys", d2.keys()
-    print "testing copy-into"
+    print("should be equal", beforedel - 1, len(d2))
+    print("keys", list(d2.keys()))
+    print("testing copy-into")
     d3 = dbm("test3", "c")
     d3["willy"] = "wally"
     d3.close()
     d3 = d2.copy("test3", "w")
-    print "should be equal", beforedel, len(d3)
-    print "keys", d3.keys()
+    print("should be equal", beforedel, len(d3))
+    print("keys", list(d3.keys()))
 
 # test
 
@@ -2337,7 +2351,7 @@ def test():
     test program: creates a bplustree file "test"
     try messing with the node size
     """
-    print "creating file 'test' in current directory for test data."
+    print("creating file 'test' in current directory for test data.")
     f = open("test", "w+b")
     B = SBplusTree(f, 0, 202, 10)
     B.startup()
@@ -2352,7 +2366,7 @@ def test():
     for x in "13579finalmopq":
         del B[x]
 
-    print "final pass"
+    print("final pass")
     from time import time
     s = time()
 
@@ -2360,7 +2374,7 @@ def test():
         B[hex(x)] = x
         # print x
 
-    print "one thousand assigns", time() - s
+    print("one thousand assigns", time() - s)
     # B.dump()
     B.disable_fifo()
     return (B, f)
@@ -2372,65 +2386,65 @@ def retest():
     B = caching_SBPT(f)
     B.open()
     B.enable_fifo()
-    print "retesting"
+    print("retesting")
 
     for x in "abcdefghi012345":
         try:
-            print x, "-->", B[x]
+            print(x, "-->", B[x])
         except KeyError:
-            print x, "absent"
+            print(x, "absent")
 
-    print "entering torture chamber"
+    print("entering torture chamber")
     s = time()
     for x in range(1000):
         l = B[hex(x)]
 
-    print "1 thousand retrieves: ", time() - s
+    print("1 thousand retrieves: ", time() - s)
     return B
 
-    print "keys, values between 4 and C (including C)"
+    print("keys, values between 4 and C (including C)")
     W = SBplusWalker(B, "4", 0, "C", 1)
     while W.valid:
-        print (W.current_key(), W.current_value()),
-        W.next()
+        print((W.current_key(), W.current_value()), end=' ')
+        next(W)
 
-    print
-    print "keys, values between 4 (including 4) and C (excluding C)"
+    print()
+    print("keys, values between 4 (including 4) and C (excluding C)")
     W = SBplusWalker(B, "4", 1, "C", 0)
     while W.valid:
-        print (W.current_key(), W.current_value()),
-        W.next()
+        print((W.current_key(), W.current_value()), end=' ')
+        next(W)
 
-    print
-    print "all keys"
+    print()
+    print("all keys")
     W = SBplusWalker(B)
     while W.valid:
-        print W.current_key(),
-        W.next()
+        print(W.current_key(), end=' ')
+        next(W)
 
-    print
-    print "A to A inclusive (1 elt)"
+    print()
+    print("A to A inclusive (1 elt)")
     W = SBplusWalker(B, "A", 1, "A", 1)
     while W.valid:
-        print W.current_key(),
-        W.next()
+        print(W.current_key(), end=' ')
+        next(W)
 
-    print
-    print "A to A exclusive (0 elt)"
+    print()
+    print("A to A exclusive (0 elt)")
     W = SBplusWalker(B, "A", 1, "A", 0)
     while W.valid:
-        print W.current_key(),
-        W.next()
+        print(W.current_key(), end=' ')
+        next(W)
 
-    print
-    print "AA to AA inclusive (0 elt)"
+    print()
+    print("AA to AA inclusive (0 elt)")
     W = SBplusWalker(B, "AA", 1, "AA", 0)
     while W.valid:
-        print W.current_key(),
-        W.next()
+        print(W.current_key(), end=' ')
+        next(W)
 
-    print
-    print
+    print()
+    print()
     B.disable_fifo()
     return (W, B, f)
 
