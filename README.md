@@ -4,10 +4,15 @@ I found this implementation at
 http://www.pha.com.au/kb/index.php/Python_-_bplustree.py
 
 I ran autopep against it and did some minor style cleanup but other than that
-it is the same as originaly written by Aaron Watters. I did attempt to update
-it to python3 via 2to3 but it barfed on the keys_indices() map() call on line
-605 and I haven't had time to dig into why it failed. So for now this will only
-work with python2.
+it is the same as originaly written by Aaron Watters. That code is in the
+'python2' branch.
+
+'master' has been updated to work with python3. The code has some performance
+issues in the marshal loads() function, profiling shows that it spends a ton
+of time there. It spends so much time there that using a bplustree to search
+for a key among 7.2 million key/value pairs took almost as long as doing a
+normal binary search of a sorted text file with those 7.2 millions key/value
+pairs :(
 
 -Daniel Walton
 
