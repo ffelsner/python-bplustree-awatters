@@ -39,9 +39,25 @@ if os.path.isfile(btree_filename):
     print("ERROR: %s already exist" % btree_filename)
     sys.exit(1)
 
+log.info("Scan the file to find the key_size")
+max_key_size = 0
+
+with open(input_filename, 'r') as fh:
+
+    for (line_number, line) in enumerate(fh):
+        (key, value) = line.strip().split(':')
+
+        key_size = len(key)
+
+        if key_size > max_key_size:
+            max_key_size = key_size
+
+assert max_key_size > 0, "key_size %s is invalid" % max_key_size
+log.info("max_key_size   : %2d bytes" % max_key_size)
+
+
 with open(btree_filename, 'w+b') as fh_btree:
-    #B = SBplusTree(fh_btree, position=0, nodesize=200, keylen=12)
-    B = SBplusTree(fh_btree, position=0, nodesize=8, keylen=12)
+    B = SBplusTree(fh_btree, position=0, nodesize=200, keylen=max_key_size)
     B.startup()
     count = 0
 

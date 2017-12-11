@@ -516,9 +516,6 @@ class Node:
                             (2 * intsize) +                         # flag, valid
                             ((size + 1) * intsize) +                # indices
                             (size * (sequence_overhead + keylen)))  # keys
-
-            log.info("cloner is None, sequence_overhead %s, intsize %s, size %s, keylen %s, storage %s" %\
-                (sequence_overhead, intsize, size, keylen, pformat(self.storage)))
         else:
             self.storage = cloner.storage
             self.fifo = cloner.fifo
